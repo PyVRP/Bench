@@ -17,7 +17,7 @@ python = "^3.9,<4.0"
 
 
 [tool.poetry.scripts]
-pyvrp = "pyvrp.cli:main"
+bench = "bench.main:main"
 
 
 [build-system]
