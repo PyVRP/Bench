@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "bench"
+version = "0.1.0"
+description = "PyVRP's benchmarking tool."
+authors = [
+    "Niels Wouda <nielswouda@gmail.com>",
+    "Leon Lan <leon.lanyidong@gmail.com>",
+    "Wouter Kool <wouter.kool@ortec.com>",
+]
+license = "MIT"
+readme = "README.md"
+
+
+[tool.poetry.dependencies]
+python = "^3.9,<4.0"
+
+
+
+[tool.poetry.scripts]
+pyvrp = "pyvrp.cli:main"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
