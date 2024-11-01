@@ -12,12 +12,18 @@ readme = "README.md"
 
 
 [tool.poetry.dependencies]
-python = "^3.9,<4.0"
-
+python = "^3.10,<3.14"
+numpy = [
+    # Numpy 1.26 is the first version of numpy that supports Python 3.12+.
+    { version = ">=1.15.2", python = "<3.12" },
+    { version = ">=1.26.0", python = ">=3.12" }
+]
+tqdm = "^4.64.1"
+tomli = "^2.0.1"
 
 
 [tool.poetry.scripts]
-bench = "bench.main:main"
+bench = "bench.cli:main"
 
 
 [tool.black]
