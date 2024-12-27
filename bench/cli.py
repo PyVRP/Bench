@@ -1,6 +1,6 @@
 import argparse
 
-from . import install, solve
+from . import install, solve, uninstall
 
 
 def main():
@@ -14,12 +14,15 @@ def main():
 
     subparsers = parser.add_subparsers(title="subcommands", dest="command")
     install.setup_parser(subparsers)
+    uninstall.setup_parser(subparsers)
     solve.setup_parser(subparsers)
 
     args = parser.parse_args()
 
     if args.command == "install":
         install.main(**vars(args))
+    elif args.command == "uninstall":
+        uninstall.main(**vars(args))
     elif args.command == "solve":
         solve.main(**vars(args))
     else:
