@@ -4,19 +4,6 @@ from pathlib import Path
 import numpy as np
 from tqdm.contrib.concurrent import process_map
 
-try:
-    from pyvrp import ProblemData, Result, SolveParams, solve
-    from pyvrp.read import ROUND_FUNCS, read
-    from pyvrp.stop import (
-        MaxIterations,
-        MaxRuntime,
-        MultipleCriteria,
-        NoImprovement,
-    )
-except ModuleNotFoundError:
-    msg = "`pyvrp` not installed. Install with the `bench install` command."
-    raise ModuleNotFoundError(msg)
-
 
 def tabulate(headers: list[str], rows: np.ndarray) -> str:
     """
@@ -41,7 +28,7 @@ def tabulate(headers: list[str], rows: np.ndarray) -> str:
     return "\n".join(header + content)
 
 
-def write_solution(where: Path, data: ProblemData, result: Result):
+def write_solution(where: Path, data, result):
     with open(where, "w") as fh:
         if data.num_vehicle_types == 1:
             fh.write(str(result.best))
@@ -109,6 +96,19 @@ def _solve(
         A tuple containing the instance name, whether the solution is feasible,
         the solution cost, the number of iterations, and the runtime.
     """
+    try:
+        from pyvrp import SolveParams, solve
+        from pyvrp.read import read
+        from pyvrp.stop import (
+            MaxIterations,
+            MaxRuntime,
+            MultipleCriteria,
+            NoImprovement,
+        )
+    except ModuleNotFoundError:
+        msg = "`pyvrp` not installed. Install with `bench install`."
+        raise ModuleNotFoundError(msg)
+
     if kwargs.get("config_loc"):
         params = SolveParams.from_file(kwargs["config_loc"])
     else:
@@ -215,7 +215,7 @@ def setup_parser(subparser):
     parser.add_argument(
         "--round_func",
         default="none",
-        choices=ROUND_FUNCS.keys(),
+        choices=["round", "trunc", "dimacs", "exact", "none"],
         help="Round function to apply for non-integral data. Default 'none'.",
     )
 
