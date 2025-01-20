@@ -32,7 +32,7 @@ def install(revision: str):
     if is_installed():
         uninstall()
 
-    url = f"git+https://github.com/pyvrp/pyvrp@{revision}#egg=pyvrp"
+    url = f"git+https://github.com/PyVRP/PyVRP@{revision}#egg=pyvrp"
     cmd = [sys.executable, "-m", "pip", "install", url]
     subprocess.check_call(cmd)
 
