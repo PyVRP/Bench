@@ -25,14 +25,21 @@ def uninstall():
     subprocess.check_call(cmd)
 
 
-def install(revision: str):
+def install(repository: str, revision: str):
     """
-    Installs a specific revision of PyVRP from GitHub.
+    Installs PyVRP from GitHub.
+
+    Parameters
+    ----------
+    repository
+        The GitHub repository to install.
+    revision
+        The revision to install.
     """
     if is_installed():
         uninstall()
 
-    url = f"git+https://github.com/PyVRP/PyVRP@{revision}#egg=pyvrp"
+    url = f"git+https://github.com/{repository}@{revision}"
     cmd = [sys.executable, "-m", "pip", "install", url]
     subprocess.check_call(cmd)
 
@@ -46,11 +53,16 @@ def main():
     subparsers = parser.add_subparsers(title="subcommands", dest="command")
     solve.setup_parser(subparsers)
 
-    msg = "Install PyVRP."
+    msg = "Install PyVRP from Github."
     subparser = subparsers.add_parser("install", description=msg, help=msg)
 
-    msg = "Revision to install from PyVRP's GitHub repository."
-    subparser.add_argument("--revision", default="main", type=str, help=msg)
+    msg = "Github repository to install PyVRP."
+    subparser.add_argument(
+        "--repository", type=str, default="PyVRP/PyVRP", help=msg
+    )
+
+    msg = "Revision to install."
+    subparser.add_argument("--revision", type=str, default="main", help=msg)
 
     msg = "Uninstall PyVRP."
     subparsers.add_parser("uninstall", description=msg, help=msg)
@@ -60,7 +72,7 @@ def main():
     if args.command == "solve":
         solve.main(**vars(args))
     elif args.command == "install":
-        install(args.revision)
+        install(args.repository, args.revision)
     elif args.command == "uninstall":
         uninstall()
     else:
