@@ -22,4 +22,3 @@ repos:
     rev: v1.4.1
     hooks:
       - id: mypy
-        additional_dependencies: [ types-setuptools ]

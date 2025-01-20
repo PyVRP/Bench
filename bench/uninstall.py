@@ -1,18 +1,13 @@
 import subprocess
 import sys
-
-from pkg_resources import DistributionNotFound, get_distribution
+from importlib.util import find_spec
 
 
 def is_installed() -> bool:
     """
     Checks if PyVRP is already installed.
     """
-    try:
-        get_distribution("pyvrp")
-        return True
-    except DistributionNotFound:
-        return False
+    return find_spec("pyvrp") is not None
 
 
 def uninstall():
@@ -31,5 +26,3 @@ def setup_parser(subparsers):
 def main(**kwargs):
     if is_installed():
         uninstall()
-    else:
-        pass
