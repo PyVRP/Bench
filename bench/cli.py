@@ -6,39 +6,6 @@ from importlib.util import find_spec
 from . import solve
 
 
-def main():
-    """
-    Main entry point for Bench.
-    """
-    description = """
-    Bench: PyVRP's benchmarking tool.
-    """
-    parser = argparse.ArgumentParser(prog="bench", description=description)
-
-    subparsers = parser.add_subparsers(title="subcommands", dest="command")
-    solve.setup_parser(subparsers)
-
-    msg = "Install PyVRP."
-    subparser = subparsers.add_parser("install", description=msg, help=msg)
-
-    msg = "Revision to install from PyVRP's GitHub repository."
-    subparser.add_argument("--revision", default="main", type=str, help=msg)
-
-    msg = "Uninstall PyVRP."
-    subparsers.add_parser("uninstall", description=msg, help=msg)
-
-    args = parser.parse_args()
-
-    if args.command == "install":
-        install(args.revision)
-    elif args.command == "uninstall":
-        uninstall()
-    elif args.command == "solve":
-        solve.main(**vars(args))
-    else:
-        parser.print_help()
-
-
 def is_installed() -> bool:
     """
     Checks if PyVRP is already installed.
@@ -68,6 +35,36 @@ def install(revision: str):
     url = f"git+https://github.com/pyvrp/pyvrp@{revision}#egg=pyvrp"
     cmd = [sys.executable, "-m", "pip", "install", url]
     subprocess.check_call(cmd)
+
+
+def main():
+    description = """
+    Bench: PyVRP's benchmarking tool.
+    """
+    parser = argparse.ArgumentParser(prog="bench", description=description)
+
+    subparsers = parser.add_subparsers(title="subcommands", dest="command")
+    solve.setup_parser(subparsers)
+
+    msg = "Install PyVRP."
+    subparser = subparsers.add_parser("install", description=msg, help=msg)
+
+    msg = "Revision to install from PyVRP's GitHub repository."
+    subparser.add_argument("--revision", default="main", type=str, help=msg)
+
+    msg = "Uninstall PyVRP."
+    subparsers.add_parser("uninstall", description=msg, help=msg)
+
+    args = parser.parse_args()
+
+    if args.command == "solve":
+        solve.main(**vars(args))
+    elif args.command == "install":
+        install(args.revision)
+    elif args.command == "uninstall":
+        uninstall()
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
