@@ -236,12 +236,19 @@ def benchmark(
     data = np.asarray(res, dtype=dtypes)
     headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)", "Gap (%)"]
 
+    exclude_gap = np.isnan(data["gap"]).all()
+    if exclude_gap:
+        data = data[["inst", "ok", "obj", "iters", "time"]]
+        headers = headers[:-1]
+
     print("\n", tabulate(headers, data), "\n", sep="")
     print(f"     Avg. objective: {data['obj'].mean():.0f}")
     print(f"    Avg. iterations: {data['iters'].mean():.0f}")
     print(f"      Avg. run-time: {data['time'].mean():.2f}s")
     print(f"       Total not OK: {np.count_nonzero(data['ok'] == 'N')}")
-    print(f"           Avg. gap: {data['gap'].mean():.2f}%")
+
+    if not exclude_gap:
+        print(f"           Avg. gap: {data['gap'].mean():.2f}%")
 
 
 def setup_parser(subparser):
