@@ -63,6 +63,7 @@ def _solve(
     per_client: bool,
     stats_dir: Path | None,
     sol_dir: Path | None,
+    display: bool,
     **kwargs,
 ) -> tuple[str, str, float, int, float]:
     """
@@ -89,6 +90,8 @@ def _solve(
         The directory to write runtime statistics to.
     sol_dir
         The directory to write the best found solutions to.
+    display
+        Whether to display information about the solver progress.
 
     Returns
     -------
@@ -129,7 +132,9 @@ def _solve(
         ]
     )
 
-    result = solve(data, stop, seed, bool(stats_dir), params=params)
+    result = solve(
+        data, stop, seed, bool(stats_dir) or display, display, params=params
+    )
     instance_name = data_loc.stem
 
     if stats_dir:
@@ -251,6 +256,9 @@ def setup_parser(subparser):
 
     msg = "Whether to scale stopping criteria values by the number of clients."
     stop.add_argument("--per_client", action="store_true")
+
+    msg = "Whether to display information about the solver progress."
+    parser.add_argument("--display", action="store_true")
 
 
 def main(**kwargs):
