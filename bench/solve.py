@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from tqdm.contrib.concurrent import process_map
+from vrplib import read_solution
 
 
 def tabulate(headers: list[str], rows: np.ndarray) -> str:
@@ -55,6 +56,7 @@ def write_solution(where: Path, data, result):
 
 def _solve(
     data_loc: Path,
+    bks_loc: Path | None,
     round_func: str,
     seed: int,
     max_runtime: float,
@@ -65,7 +67,7 @@ def _solve(
     sol_dir: Path | None,
     display: bool,
     **kwargs,
-) -> tuple[str, str, float, int, float]:
+) -> tuple[str, str, float, int, float, float]:
     """
     Solves a single VRPLIB instance.
 
@@ -73,6 +75,8 @@ def _solve(
     ----------
     data_loc
         Filesystem location of the VRPLIB instance.
+    bks_loc
+        Filesystem location of the best known solution, if available.
     round_func
         Rounding function to use for rounding non-integral data. Argument is
         passed to ``read()``.
@@ -95,9 +99,9 @@ def _solve(
 
     Returns
     -------
-    tuple[str, str, float, int, float]
+    tuple[str, str, float, int, float, float]
         A tuple containing the instance name, whether the solution is feasible,
-        the solution cost, the number of iterations, and the runtime.
+        the solution cost, the number of iterations, the runtime and the gap.
     """
     try:
         from pyvrp import SolveParams, solve
@@ -145,16 +149,25 @@ def _solve(
         sol_dir.mkdir(parents=True, exist_ok=True)  # just in case
         write_solution(sol_dir / (instance_name + ".sol"), data, result)
 
+    if bks_loc:
+        bks = read_solution(bks_loc)["cost"]
+        gap = (result.cost() - bks) / bks * 100
+    else:
+        gap = float("nan")
+
     return (
         instance_name,
         "Y" if result.is_feasible() else "N",
         round(result.cost(), 2),
         result.num_iterations,
         round(result.runtime, 3),
+        round(gap, 2),
     )
 
 
-def benchmark(instances: list[Path], num_procs: int, **kwargs):
+def benchmark(
+    instances: list[Path], solutions: list[Path], num_procs: int, **kwargs
+):
     """
     Solves a list of instances, and prints a table with the results. Any
     additional keyword arguments are passed to ``solve()``.
@@ -163,18 +176,28 @@ def benchmark(instances: list[Path], num_procs: int, **kwargs):
     ----------
     instances
         Paths to the VRPLIB instances to solve.
+    solutions
+        Paths to the best known solutions for the instances.
     num_procs
         Number of processors to use. Default 1.
     kwargs
         Any additional keyword arguments to pass to the solving function.
     """
-    args = sorted(instances)
+    # Pair each instance with its matching solution, if it exists.
+    name2sol = {sol.stem: sol for sol in solutions}
+    args = [
+        (instance, name2sol.get(instance.stem))
+        for instance in sorted(instances)
+    ]
+
     func = partial(_solve, **kwargs)
 
     if len(instances) == 1:
-        res = [func(args[0])]
+        res = [func(*args[0])]
     else:
-        res = process_map(func, args, max_workers=num_procs, unit="instance")
+        res = process_map(
+            func, *zip(*args), max_workers=num_procs, unit="instance"
+        )
 
     dtypes = [
         ("inst", "U37"),
@@ -182,16 +205,18 @@ def benchmark(instances: list[Path], num_procs: int, **kwargs):
         ("obj", float),
         ("iters", int),
         ("time", float),
+        ("gap", float),
     ]
 
     data = np.asarray(res, dtype=dtypes)
-    headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)"]
+    headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)", "Gap (%)"]
 
     print("\n", tabulate(headers, data), "\n", sep="")
     print(f"     Avg. objective: {data['obj'].mean():.0f}")
     print(f"    Avg. iterations: {data['iters'].mean():.0f}")
     print(f"      Avg. run-time: {data['time'].mean():.2f}s")
     print(f"       Total not OK: {np.count_nonzero(data['ok'] == 'N')}")
+    print(f"           Avg. gap: {data['gap'].mean():.2f}%")
 
 
 def setup_parser(subparser):
@@ -205,6 +230,14 @@ def setup_parser(subparser):
 
     msg = "One or more paths to the VRPLIB instance(s) to solve."
     parser.add_argument("instances", nargs="+", type=Path, help=msg)
+
+    msg = """
+    One or more paths to the best known solutions for the instances.
+    Instances are matched with solutions by filename stem.
+    """
+    parser.add_argument(
+        "--solutions", nargs="+", default=[], type=Path, help=msg
+    )
 
     msg = """
     Directory to store runtime statistics in, as CSV files (one per instance).
