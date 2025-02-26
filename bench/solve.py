@@ -106,7 +106,7 @@ def _solve(
     data_loc
         Filesystem location of the VRPLIB instance.
     bks_loc
-        Filesystem location of the best known solution, if available.
+        Filesystem location of the best-known solution, if available.
     round_func
         Rounding function to use for rounding non-integral data. Argument is
         passed to ``read()``.
@@ -206,7 +206,7 @@ def benchmark(
     instances
         Paths to the VRPLIB instances to solve.
     solutions
-        Paths to the best known solutions for the instances.
+        Paths to the best-known solutions for the instances.
     num_procs
         Number of processors to use. Default 1.
     kwargs
@@ -214,7 +214,7 @@ def benchmark(
     """
     # Pair each instance with its matching solution, if it exists.
     name2sol = {sol.stem: sol for sol in solutions}
-    args = [(loc, name2sol.get(loc.stem)) for loc in sorted(instances)]
+    args = [(inst, name2sol.get(inst.stem)) for inst in sorted(instances)]
     func = partial(_solve, **kwargs)
 
     if len(instances) == 1:
@@ -257,7 +257,7 @@ def setup_parser(subparser):
     parser.add_argument("instances", nargs="+", type=Path, help=msg)
 
     msg = """
-    One or more paths to the best known solutions for the instances.
+    One or more paths to the best-known solutions of the instances.
     Instances are matched with solutions by filename stem.
     """
     parser.add_argument(
