@@ -57,11 +57,11 @@ def write_solution(where: Path, data, result):
 
 class SolveResult(NamedTuple):
     """
-    Named tuple to store the result of a single solver run.
+    Named tuple to store the results of a single solver run.
 
     Attributes
     ----------
-    instance_name
+    instance
         The name of the instance.
     feasible
         "Y" if the solution is feasible, "N" otherwise.
@@ -70,13 +70,13 @@ class SolveResult(NamedTuple):
     num_iterations
         The number of iterations the solver took.
     runtime
-        The runtime of the solver.
+        The runtime in seconds of the solver run.
     gap
         The gap to the best-known solution. If there was no best-known
         solution, this is ``float('nan')``.
     """
 
-    instance_name: str
+    instance: str
     feasible: str
     cost: float
     num_iterations: int
