@@ -1,5 +1,6 @@
 from functools import partial
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 from tqdm.contrib.concurrent import process_map
@@ -54,6 +55,35 @@ def write_solution(where: Path, data, result):
         fh.write(f"Cost: {round(result.cost(), 2)}\n")
 
 
+class SolveResult(NamedTuple):
+    """
+    Named tuple to store the result of a single solver run.
+
+    Attributes
+    ----------
+    instance_name
+        The name of the instance.
+    feasible
+        "Y" if the solution is feasible, "N" otherwise.
+    cost
+        The cost of the solution.
+    num_iterations
+        The number of iterations the solver took.
+    runtime
+        The runtime of the solver.
+    gap
+        The gap to the best-known solution. If there was no best-known
+        solution, this is ``float('nan')``.
+    """
+
+    instance_name: str
+    feasible: str
+    cost: float
+    num_iterations: int
+    runtime: float
+    gap: float
+
+
 def _solve(
     data_loc: Path,
     bks_loc: Path | None,
@@ -67,7 +97,7 @@ def _solve(
     sol_dir: Path | None,
     display: bool,
     **kwargs,
-) -> tuple[str, str, float, int, float, float]:
+) -> SolveResult:
     """
     Solves a single VRPLIB instance.
 
@@ -99,9 +129,8 @@ def _solve(
 
     Returns
     -------
-    tuple[str, str, float, int, float, float]
-        A tuple containing the instance name, whether the solution is feasible,
-        the solution cost, the number of iterations, the runtime and the gap.
+    SolveResult
+        The result of the solver run.
     """
     try:
         from pyvrp import SolveParams, solve
@@ -155,7 +184,7 @@ def _solve(
     else:
         gap = float("nan")
 
-    return (
+    return SolveResult(
         instance_name,
         "Y" if result.is_feasible() else "N",
         round(result.cost(), 2),
@@ -185,11 +214,7 @@ def benchmark(
     """
     # Pair each instance with its matching solution, if it exists.
     name2sol = {sol.stem: sol for sol in solutions}
-    args = [
-        (instance, name2sol.get(instance.stem))
-        for instance in sorted(instances)
-    ]
-
+    args = [(loc, name2sol.get(loc.stem)) for loc in sorted(instances)]
     func = partial(_solve, **kwargs)
 
     if len(instances) == 1:
