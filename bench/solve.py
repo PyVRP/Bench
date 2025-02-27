@@ -106,7 +106,7 @@ def _solve(
     data_loc
         Filesystem location of the VRPLIB instance.
     bks_loc
-        Filesystem location of the best-known solution, if available.
+        Filesystem location of the best-known solution, if provided.
     round_func
         Rounding function to use for rounding non-integral data. Argument is
         passed to ``read()``.
@@ -206,22 +206,24 @@ def benchmark(
     instances
         Paths to the VRPLIB instances to solve.
     solutions
-        Paths to the best-known solutions for the instances.
+        Paths to the best-known solutions, if provided.
     num_procs
-        Number of processors to use. Default 1.
+        Number of processors to use.
     kwargs
         Any additional keyword arguments to pass to the solving function.
     """
-    # Pair each instance with its matching solution, if it exists.
-    name2sol = {sol.stem: sol for sol in solutions}
-    args = [(inst, name2sol.get(inst.stem)) for inst in sorted(instances)]
+    if solutions and len(instances) != len(solutions):
+        raise ValueError("Number of instances and solutions must match.")
+
+    insts = sorted(instances)
+    sols = sorted(solutions) if solutions else [None] * len(insts)  # type: ignore # noqa
     func = partial(_solve, **kwargs)
 
     if len(instances) == 1:
-        res = [func(*args[0])]
+        res = [func(insts[0], sols[0])]
     else:
         res = process_map(
-            func, *zip(*args), max_workers=num_procs, unit="instance"
+            func, insts, sols, max_workers=num_procs, unit="instance"
         )
 
     dtypes = [
@@ -264,8 +266,9 @@ def setup_parser(subparser):
     parser.add_argument("instances", nargs="+", type=Path, help=msg)
 
     msg = """
-    One or more paths to the best-known solutions of the instances.
-    Instances are matched with solutions by filename stem.
+    Optional paths to best-known solutions in VRPLIB format. If provided, it
+    must match the number of instances. Both instance and solution paths are
+    paired in alphabetical order.
     """
     parser.add_argument(
         "--solutions", nargs="+", default=[], type=Path, help=msg
