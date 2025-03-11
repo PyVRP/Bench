@@ -241,7 +241,7 @@ def benchmark(
     data = np.asarray(res, dtype=dtypes)
     headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)", "Gap (%)"]
 
-    exclude_gap = np.isnan(data["gap"]).all()
+    exclude_gap = solutions is None
     if exclude_gap:
         data = data[["inst", "ok", "obj", "iters", "time"]]
         headers = headers[:-1]
