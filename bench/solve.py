@@ -72,8 +72,8 @@ class SolveResult(NamedTuple):
     runtime
         The runtime in seconds of the solver run.
     gap
-        The gap to the best-known solution. If there was no best-known
-        solution, this is ``float('nan')``.
+        The gap to the best-known solution if there is one, otherwise
+        ``float('nan')``.
     """
 
     instance: str
@@ -195,7 +195,10 @@ def _solve(
 
 
 def benchmark(
-    instances: list[Path], solutions: list[Path], num_procs: int, **kwargs
+    instances: list[Path],
+    solutions: list[Path] | None,
+    num_procs: int,
+    **kwargs,
 ):
     """
     Solves a list of instances, and prints a table with the results. Any
@@ -213,11 +216,11 @@ def benchmark(
         Any additional keyword arguments to pass to the solving function.
     """
     if solutions and len(instances) != len(solutions):
-        raise ValueError("Number of instances and solutions must match.")
+        raise ValueError("Number of instances and solutions must be equal.")
 
-    insts = sorted(instances)
-    sols = sorted(solutions) if solutions else [None] * len(insts)  # type: ignore # noqa
     func = partial(_solve, **kwargs)
+    insts = sorted(instances)
+    sols: list = sorted(solutions) if solutions else [None] * len(insts)
 
     if len(instances) == 1:
         res = [func(insts[0], sols[0])]
@@ -267,8 +270,8 @@ def setup_parser(subparser):
 
     msg = """
     Optional paths to best-known solutions in VRPLIB format. If provided, it
-    must match the number of instances. Both instance and solution paths are
-    paired in alphabetical order.
+    must match the number of instances. Instances and solutions are paired in
+    alphabetical order.
     """
     parser.add_argument(
         "--solutions", nargs="+", default=[], type=Path, help=msg
