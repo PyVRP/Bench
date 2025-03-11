@@ -273,9 +273,7 @@ def setup_parser(subparser):
     must match the number of instances. Instances and solutions are paired in
     alphabetical order.
     """
-    parser.add_argument(
-        "--solutions", nargs="+", default=[], type=Path, help=msg
-    )
+    parser.add_argument("--solutions", nargs="+", type=Path, help=msg)
 
     msg = """
     Directory to store runtime statistics in, as CSV files (one per instance).
