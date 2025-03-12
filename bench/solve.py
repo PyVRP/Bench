@@ -1,10 +1,9 @@
 from functools import partial
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import numpy as np
 from tqdm.contrib.concurrent import process_map
-from vrplib import read_solution
 
 
 def tabulate(headers: list[str], rows: np.ndarray) -> str:
@@ -55,6 +54,27 @@ def write_solution(where: Path, data, result):
         fh.write(f"Cost: {round(result.cost(), 2)}\n")
 
 
+def read_solution(loc: Path, data):
+    """
+    Wrapper around the `_read_solution` function to create a `Solution` object.
+    """
+    from pyvrp import Route, Solution
+    from pyvrp import read_solution as _read_solution
+
+    # We assume that the routes are listed in order of vehicle types as
+    # determined by ``read()``.
+    idx2type = [
+        idx
+        for idx, veh_type in enumerate(data.vehicle_types())
+        for _ in range(veh_type.num_available)
+    ]
+    routes = [
+        Route(data, visits, idx2type[idx])
+        for idx, visits in enumerate(_read_solution(loc))
+    ]
+    return Solution(data, routes)
+
+
 class SolveResult(NamedTuple):
     """
     Named tuple to store the results of a single solver run.
@@ -77,7 +97,7 @@ class SolveResult(NamedTuple):
     """
 
     instance: str
-    feasible: str
+    feasible: Literal["Y", "N"]
     cost: float
     num_iterations: int
     runtime: float
@@ -133,8 +153,12 @@ def _solve(
         The result of the solver run.
     """
     try:
-        from pyvrp import SolveParams, solve
-        from pyvrp.read import read
+        from pyvrp import (
+            CostEvaluator,
+            SolveParams,
+            read,
+            solve,
+        )
         from pyvrp.stop import (
             MaxIterations,
             MaxRuntime,
@@ -178,11 +202,12 @@ def _solve(
         sol_dir.mkdir(parents=True, exist_ok=True)  # just in case
         write_solution(sol_dir / (instance_name + ".sol"), data, result)
 
+    gap = float("nan")
     if bks_loc:
-        bks = read_solution(bks_loc)["cost"]
+        sol = read_solution(bks_loc, data)
+        cost_eval = CostEvaluator([0] * data.num_load_dimensions, 0, 0)
+        bks = cost_eval.cost(sol)
         gap = (result.cost() - bks) / bks * 100
-    else:
-        gap = float("nan")
 
     return SolveResult(
         instance_name,
@@ -219,8 +244,9 @@ def benchmark(
         raise ValueError("Number of instances and solutions must be equal.")
 
     func = partial(_solve, **kwargs)
-    insts = sorted(instances)
-    sols: list = sorted(solutions) if solutions else [None] * len(insts)
+    idcs = sorted(range(len(instances)), key=lambda idx: str(instances[idx]))
+    insts = [instances[idx] for idx in idcs]
+    sols = [solutions[idx] if solutions else None for idx in idcs]
 
     if len(instances) == 1:
         res = [func(insts[0], sols[0])]
