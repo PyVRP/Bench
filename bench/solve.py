@@ -1,5 +1,6 @@
 from functools import partial
 from pathlib import Path
+from typing import Literal, NamedTuple
 
 import numpy as np
 from tqdm.contrib.concurrent import process_map
@@ -53,8 +54,38 @@ def write_solution(where: Path, data, result):
         fh.write(f"Cost: {round(result.cost(), 2)}\n")
 
 
+class SolveResult(NamedTuple):
+    """
+    Named tuple to store the results of a single solver run.
+
+    Attributes
+    ----------
+    instance
+        The name of the instance.
+    feasible
+        "Y" if the solution is feasible, "N" otherwise.
+    cost
+        The cost of the solution.
+    num_iterations
+        The number of iterations the solver took.
+    runtime
+        The runtime in seconds of the solver run.
+    gap
+        The gap to the best-known solution if there is one, otherwise
+        ``float('nan')``.
+    """
+
+    instance: str
+    feasible: Literal["Y", "N"]
+    cost: float
+    num_iterations: int
+    runtime: float
+    gap: float
+
+
 def _solve(
     data_loc: Path,
+    bks_loc: Path | None,
     round_func: str,
     seed: int,
     max_runtime: float,
@@ -65,7 +96,7 @@ def _solve(
     sol_dir: Path | None,
     display: bool,
     **kwargs,
-) -> tuple[str, str, float, int, float]:
+) -> SolveResult:
     """
     Solves a single VRPLIB instance.
 
@@ -73,6 +104,8 @@ def _solve(
     ----------
     data_loc
         Filesystem location of the VRPLIB instance.
+    bks_loc
+        Filesystem location of the best-known solution, if provided.
     round_func
         Rounding function to use for rounding non-integral data. Argument is
         passed to ``read()``.
@@ -95,13 +128,17 @@ def _solve(
 
     Returns
     -------
-    tuple[str, str, float, int, float]
-        A tuple containing the instance name, whether the solution is feasible,
-        the solution cost, the number of iterations, and the runtime.
+    SolveResult
+        The result of the solver run.
     """
     try:
-        from pyvrp import SolveParams, solve
-        from pyvrp.read import read
+        from pyvrp import (
+            CostEvaluator,
+            SolveParams,
+            read,
+            read_solution,
+            solve,
+        )
         from pyvrp.stop import (
             MaxIterations,
             MaxRuntime,
@@ -145,16 +182,29 @@ def _solve(
         sol_dir.mkdir(parents=True, exist_ok=True)  # just in case
         write_solution(sol_dir / (instance_name + ".sol"), data, result)
 
-    return (
+    gap = float("nan")
+    if bks_loc:
+        sol = read_solution(bks_loc, data)
+        cost_eval = CostEvaluator([0] * data.num_load_dimensions, 0, 0)
+        bks = cost_eval.cost(sol)
+        gap = 100 * (result.cost() - bks) / bks
+
+    return SolveResult(
         instance_name,
         "Y" if result.is_feasible() else "N",
         round(result.cost(), 2),
         result.num_iterations,
         round(result.runtime, 3),
+        round(gap, 2),
     )
 
 
-def benchmark(instances: list[Path], num_procs: int, **kwargs):
+def benchmark(
+    instances: list[Path],
+    solutions: list[Path] | None,
+    num_procs: int,
+    **kwargs,
+):
     """
     Solves a list of instances, and prints a table with the results. Any
     additional keyword arguments are passed to ``solve()``.
@@ -163,18 +213,25 @@ def benchmark(instances: list[Path], num_procs: int, **kwargs):
     ----------
     instances
         Paths to the VRPLIB instances to solve.
+    solutions
+        Paths to the best-known solutions, if provided.
     num_procs
-        Number of processors to use. Default 1.
+        Number of processors to use.
     kwargs
         Any additional keyword arguments to pass to the solving function.
     """
-    args = sorted(instances)
+    if solutions and len(instances) != len(solutions):
+        raise ValueError("Number of instances and solutions must be equal.")
+
     func = partial(_solve, **kwargs)
+    sols = solutions if solutions else [None] * len(instances)  # type: ignore
 
     if len(instances) == 1:
-        res = [func(args[0])]
+        res = [func(instances[0], sols[0])]
     else:
-        res = process_map(func, args, max_workers=num_procs, unit="instance")
+        res = process_map(
+            func, instances, sols, max_workers=num_procs, unit="instance"
+        )
 
     dtypes = [
         ("inst", "U37"),
@@ -182,16 +239,25 @@ def benchmark(instances: list[Path], num_procs: int, **kwargs):
         ("obj", float),
         ("iters", int),
         ("time", float),
+        ("gap", float),
     ]
 
     data = np.asarray(res, dtype=dtypes)
-    headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)"]
+    headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)", "Gap (%)"]
+
+    exclude_gap = solutions is None
+    if exclude_gap:
+        data = data[["inst", "ok", "obj", "iters", "time"]]
+        headers = headers[:-1]
 
     print("\n", tabulate(headers, data), "\n", sep="")
     print(f"     Avg. objective: {data['obj'].mean():.0f}")
     print(f"    Avg. iterations: {data['iters'].mean():.0f}")
     print(f"      Avg. run-time: {data['time'].mean():.2f}s")
     print(f"       Total not OK: {np.count_nonzero(data['ok'] == 'N')}")
+
+    if not exclude_gap:
+        print(f"           Avg. gap: {data['gap'].mean():.2f}%")
 
 
 def setup_parser(subparser):
@@ -205,6 +271,13 @@ def setup_parser(subparser):
 
     msg = "One or more paths to the VRPLIB instance(s) to solve."
     parser.add_argument("instances", nargs="+", type=Path, help=msg)
+
+    msg = """
+    Optional paths to best-known solutions in VRPLIB format, used to calculate
+    gaps. If provided, it must match the number of instances. Instances and
+    solutions are paired in the given order.
+    """
+    parser.add_argument("--solutions", nargs="+", type=Path, help=msg)
 
     msg = """
     Directory to store runtime statistics in, as CSV files (one per instance).
