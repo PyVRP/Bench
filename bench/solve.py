@@ -273,9 +273,9 @@ def setup_parser(subparser):
     parser.add_argument("instances", nargs="+", type=Path, help=msg)
 
     msg = """
-    Optional paths to best-known solutions in VRPLIB format. If provided, it
-    must match the number of instances. Instances and solutions are paired
-    by the passed-in ordering.
+    Optional paths to best-known solutions in VRPLIB format, used to calculate
+    gaps. If provided, it must match the number of instances. Instances and
+    solutions are paired in the given order.
     """
     parser.add_argument("--solutions", nargs="+", type=Path, help=msg)
 
