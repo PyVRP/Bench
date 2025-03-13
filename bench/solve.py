@@ -54,27 +54,6 @@ def write_solution(where: Path, data, result):
         fh.write(f"Cost: {round(result.cost(), 2)}\n")
 
 
-def read_solution(loc: Path, data):
-    """
-    Wrapper around the `_read_solution` function to create a `Solution` object.
-    """
-    from pyvrp import Route, Solution
-    from pyvrp import read_solution as _read_solution
-
-    # We assume that the routes are listed in order of vehicle types as
-    # determined by ``read()``.
-    idx2type = [
-        idx
-        for idx, veh_type in enumerate(data.vehicle_types())
-        for _ in range(veh_type.num_available)
-    ]
-    routes = [
-        Route(data, visits, idx2type[idx])
-        for idx, visits in enumerate(_read_solution(loc))
-    ]
-    return Solution(data, routes)
-
-
 class SolveResult(NamedTuple):
     """
     Named tuple to store the results of a single solver run.
@@ -157,6 +136,7 @@ def _solve(
             CostEvaluator,
             SolveParams,
             read,
+            read_solution,
             solve,
         )
         from pyvrp.stop import (
