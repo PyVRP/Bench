@@ -244,15 +244,13 @@ def benchmark(
         raise ValueError("Number of instances and solutions must be equal.")
 
     func = partial(_solve, **kwargs)
-    idcs = sorted(range(len(instances)), key=lambda idx: str(instances[idx]))
-    insts = [instances[idx] for idx in idcs]
-    sols = [solutions[idx] if solutions else None for idx in idcs]
+    sols = solutions if solutions else [None] * len(instances)  # type: ignore
 
     if len(instances) == 1:
-        res = [func(insts[0], sols[0])]
+        res = [func(instances[0], sols[0])]
     else:
         res = process_map(
-            func, insts, sols, max_workers=num_procs, unit="instance"
+            func, instances, sols, max_workers=num_procs, unit="instance"
         )
 
     dtypes = [
@@ -296,8 +294,8 @@ def setup_parser(subparser):
 
     msg = """
     Optional paths to best-known solutions in VRPLIB format. If provided, it
-    must match the number of instances. Instances and solutions are paired in
-    alphabetical order.
+    must match the number of instances. Instances and solutions are paired
+    by the passed-in ordering.
     """
     parser.add_argument("--solutions", nargs="+", type=Path, help=msg)
 
