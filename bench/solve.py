@@ -187,7 +187,7 @@ def _solve(
         sol = read_solution(bks_loc, data)
         cost_eval = CostEvaluator([0] * data.num_load_dimensions, 0, 0)
         bks = cost_eval.cost(sol)
-        gap = (result.cost() - bks) / bks * 100
+        gap = 100 * (result.cost() - bks) / bks
 
     return SolveResult(
         instance_name,
