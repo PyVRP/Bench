@@ -31,7 +31,7 @@ subcommands:
 
 ### Solving instances
 
-The main functionality of `bench` is to solve [VRPLIB](https://pyvrp.org/dev/supported_vrplib_fields.html) instances with PyVRP through its `solve` subcommand:
+The main functionality of `bench` is to solve [VRPLIB](https://pyvrp.org/dev/supported_vrplib_fields.html) instances with PyVRP through the `solve` subcommand:
 
 ```bash
 bench solve path/to/instances/*.vrp --seed 1 --max_runtime 60
