@@ -49,11 +49,11 @@ List all available options with `bench solve --help`. Key options include:
 You can also easily install specific versions of PyVRP through `bench`:
 
 ```bash
-bench install # installs main
+bench install  # installs main
 bench install --revision f57ff85
 ```
 
-To uninstall PyVRP, run
+To uninstall the currently installed version of PyVRP, run
 
 ```bash
 bench uninstall
