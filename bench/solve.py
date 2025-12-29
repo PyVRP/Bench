@@ -79,6 +79,9 @@ class SolveResult(NamedTuple):
     gap
         The gap to the best-known solution if there is one, otherwise
         ``float('nan')``.
+    primal_integral
+        The primal integral of the solver run if a best-known solution is
+        provided and statistics are collected. Otherwise, ``float('nan')``.
     """
 
     instance: str
@@ -87,6 +90,7 @@ class SolveResult(NamedTuple):
     num_iterations: int
     runtime: float
     gap: float
+    primal_integral: float
 
 
 def _solve(
@@ -189,11 +193,23 @@ def _solve(
         write_solution(sol_dir / (instance_name + ".sol"), data, result)
 
     gap = float("nan")
+    primal_integral = float("nan")
+
     if bks_loc:
         sol = read_solution(bks_loc, data)
         cost_eval = CostEvaluator([0] * data.num_load_dimensions, 0, 0)
         bks = cost_eval.cost(sol)
         gap = 100 * (result.cost() - bks) / bks
+
+        # TODO COMPUTE PRIMAL INTEGRAL
+        stats = result.stats
+        if stats.is_collecting:
+            # [datum.best_cost for datum in stats.data]
+            # [datum.best_feas for datum in stats.data]
+
+            # np.trapz over de stats, gedeeld door runtime * bks value, -1
+            area = np.trapezoid(stats.best_costs, stats.runtimes)
+            primal_integral = area / (result.runtime * bks) - 1
 
     return SolveResult(
         instance_name,
@@ -202,6 +218,7 @@ def _solve(
         result.num_iterations,
         round(result.runtime, 3),
         round(gap, 2),
+        round(primal_integral, 3),
     )
 
 
@@ -246,15 +263,24 @@ def benchmark(
         ("iters", int),
         ("time", float),
         ("gap", float),
+        ("pi", float),
     ]
 
     data = np.asarray(res, dtype=dtypes)
-    headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)", "Gap (%)"]
+    headers = [
+        "Instance",
+        "OK",
+        "Obj.",
+        "Iters. (#)",
+        "Time (s)",
+        "Gap (%)",
+        "Primal Int.",
+    ]
 
-    exclude_gap = solutions is None
-    if exclude_gap:
+    exclude_headers = solutions is None
+    if exclude_headers:
         data = data[["inst", "ok", "obj", "iters", "time"]]
-        headers = headers[:-1]
+        headers = headers[:-2]
 
     print("\n", tabulate(headers, data), "\n", sep="")
     print(f"     Avg. objective: {data['obj'].mean():.0f}")
@@ -262,8 +288,9 @@ def benchmark(
     print(f"      Avg. run-time: {data['time'].mean():.2f}s")
     print(f"       Total not OK: {np.count_nonzero(data['ok'] == 'N')}")
 
-    if not exclude_gap:
+    if not exclude_headers:
         print(f"           Avg. gap: {data['gap'].mean():.2f}%")
+        print(f"   Avg. primal int.: {data['pi'].mean():.3f}")
 
 
 def setup_parser(subparser):
@@ -280,8 +307,8 @@ def setup_parser(subparser):
 
     msg = """
     Optional paths to best-known solutions in VRPLIB format, used to calculate
-    gaps. If provided, it must match the number of instances. Instances and
-    solutions are paired in the given order.
+    gaps and primal integrals. If provided, it must match the number of
+    instances. Instances and solutions are paired in the given order.
     """
     parser.add_argument("--solutions", nargs="+", type=Path, help=msg)
 
