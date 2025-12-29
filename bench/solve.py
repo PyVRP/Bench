@@ -202,27 +202,23 @@ def _solve(
         gap = 100 * (result.cost() - bks) / bks
 
         stats = result.stats
-        primal_integral = 1
-        if stats.is_collecting and result.is_feasible():
-            first_feas = np.argmax([d.best_feas for d in stats.data])
+        primal_integral = 100
+        if stats.data and result.is_feasible():
+            # Filter all cumulative runtimes and best costs from the first
+            # feasible solution.
+            feas = next(idx for idx, d in enumerate(stats.data) if d.best_feas)
+            runtimes = np.cumsum(stats.runtimes)[feas:]
+            best_costs = np.array([d.best_cost for d in stats.data[feas:]])
 
-            # Start the primal integral from the first feasible solution.
-            best_costs = np.array([d.best_cost for d in stats.data])
-            best_costs = best_costs[first_feas:]
+            # Store the cost for each incumbent, along with when it was found.
+            _, idcs = np.unique(best_costs, return_index=True)
+            idcs.sort()  # in decreasing order of costs
+            costs = best_costs[idcs]
+            found_at = runtimes[idcs]
 
-            idcs = np.flatnonzero(np.diff(best_costs, prepend=0) != 0)
-            incumbents = best_costs[idcs]
-
-            # Calculate gaps.
-            denom = np.maximum(np.abs(incumbents), abs(bks))
-            gaps = abs(bks - incumbents) / denom
-            gaps = np.append(1, gaps)  # gap is 100% at time 0
-
-            runtimes = np.cumsum(stats.runtimes)[first_feas:]
-            times = runtimes[idcs]
-            times = np.append(times, result.runtime)
-            times = np.diff(times, prepend=0)
-
+            gaps = abs(bks - costs) / np.maximum(abs(costs), abs(bks))
+            gaps = np.concatenate([[1], gaps])
+            times = np.diff([0, *found_at, result.runtime])
             primal_integral = sum(times * gaps) / result.runtime * 100
 
     return SolveResult(
