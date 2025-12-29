@@ -211,14 +211,14 @@ def _solve(
         stats = result.stats
         primal_integral = 100
         if stats.data and result.is_feasible():
-            # Compute primal gap from first feasible solution onward.
+            # Compute primal gap from the first feasible solution onward.
             feas = next(idx for idx, d in enumerate(stats.data) if d.best_feas)
             costs = np.array([d.best_cost for d in stats.data[feas:]])
             gaps = abs(bks - costs) / np.maximum(abs(costs), abs(bks))
             gaps = np.concatenate([[1], gaps])  # gap is 1 till first incumbent
 
-            # Time intervals between consecutive incumbent solutions, including
-            # border cases for the first and last found solutions.
+            # Time intervals between incumbent solutions (including start and
+            # end of the solver progress).
             found_at = np.cumsum(stats.runtimes)[feas:]
             times = np.diff(prepend=0, a=found_at, append=result.runtime)
             primal_integral = sum(gaps * times) / result.runtime * 100
