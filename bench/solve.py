@@ -301,7 +301,7 @@ def benchmark(
 
     if not exclude_headers:
         print(f"           Avg. gap: {data['gap'].mean():.2f}%")
-        print(f"           Avg. PI.: {data['pi'].mean():.2f}%")
+        print(f"            Avg. PI: {data['pi'].mean():.2f}%")
 
 
 def setup_parser(subparser):
