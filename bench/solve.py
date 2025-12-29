@@ -201,15 +201,29 @@ def _solve(
         bks = cost_eval.cost(sol)
         gap = 100 * (result.cost() - bks) / bks
 
-        # TODO COMPUTE PRIMAL INTEGRAL
         stats = result.stats
-        if stats.is_collecting:
-            # [datum.best_cost for datum in stats.data]
-            # [datum.best_feas for datum in stats.data]
+        primal_integral = 1
+        if stats.is_collecting and result.is_feasible():
+            first_feas = np.argmax([d.best_feas for d in stats.data])
 
-            # np.trapz over de stats, gedeeld door runtime * bks value, -1
-            area = np.trapezoid(stats.best_costs, stats.runtimes)
-            primal_integral = area / (result.runtime * bks) - 1
+            # Start the primal integral from the first feasible solution.
+            best_costs = np.array([d.best_cost for d in stats.data])
+            best_costs = best_costs[first_feas:]
+
+            idcs = np.flatnonzero(np.diff(best_costs, prepend=0) != 0)
+            incumbents = best_costs[idcs]
+
+            # Calculate gaps.
+            denom = np.maximum(np.abs(incumbents), abs(bks))
+            gaps = abs(bks - incumbents) / denom
+            gaps = np.append(1, gaps)  # gap is 100% at time 0
+
+            runtimes = np.cumsum(stats.runtimes)[first_feas:]
+            times = runtimes[idcs]
+            times = np.append(times, result.runtime)
+            times = np.diff(times, prepend=0)
+
+            primal_integral = sum(times * gaps) / result.runtime * 100
 
     return SolveResult(
         instance_name,
@@ -218,7 +232,7 @@ def _solve(
         result.num_iterations,
         round(result.runtime, 3),
         round(gap, 2),
-        round(primal_integral, 3),
+        round(primal_integral, 2),
     )
 
 
@@ -274,7 +288,7 @@ def benchmark(
         "Iters. (#)",
         "Time (s)",
         "Gap (%)",
-        "Primal Int.",
+        "PI (%)",
     ]
 
     exclude_headers = solutions is None
@@ -290,7 +304,7 @@ def benchmark(
 
     if not exclude_headers:
         print(f"           Avg. gap: {data['gap'].mean():.2f}%")
-        print(f"   Avg. primal int.: {data['pi'].mean():.3f}")
+        print(f"           Avg. PI.: {data['pi'].mean():.2f}%")
 
 
 def setup_parser(subparser):
