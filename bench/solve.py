@@ -82,6 +82,13 @@ class SolveResult(NamedTuple):
     primal_integral
         The primal integral of the solver run if a best-known solution is
         provided and statistics are collected. Otherwise, ``float('nan')``.
+        See [1]_ for details.
+
+    References
+    ----------
+    .. [1] Berthold, T. (2013). Measuring the impact of primal heuristics.
+            *Operations Research Letters*, 41(6): 611-614.
+            https://doi.org/10.1016/j.orl.2013.08.007.
     """
 
     instance: str
@@ -204,22 +211,16 @@ def _solve(
         stats = result.stats
         primal_integral = 100
         if stats.data and result.is_feasible():
-            # Filter all cumulative runtimes and best costs from the first
-            # feasible solution.
+            # Compute primal gaps starting from the first feasible solution.
             feas = next(idx for idx, d in enumerate(stats.data) if d.best_feas)
-            runtimes = np.cumsum(stats.runtimes)[feas:]
-            best_costs = np.array([d.best_cost for d in stats.data[feas:]])
-
-            # Store the cost for each incumbent, along with when it was found.
-            _, idcs = np.unique(best_costs, return_index=True)
-            idcs.sort()  # in decreasing order of costs
-            costs = best_costs[idcs]
-            found_at = runtimes[idcs]
-
+            costs = np.array([d.best_cost for d in stats.data[feas:]])
             gaps = abs(bks - costs) / np.maximum(abs(costs), abs(bks))
-            gaps = np.concatenate([[1], gaps])
-            times = np.diff([0, *found_at, result.runtime])
-            primal_integral = sum(times * gaps) / result.runtime * 100
+            gaps = np.concatenate([[1], gaps])  # primal gap is 1 at time 0
+
+            # Do the same for time intervals between two solutions.
+            runtimes = np.cumsum(stats.runtimes)[feas:]
+            times = np.diff(prepend=0, a=runtimes, append=result.runtime)
+            primal_integral = sum(gaps * times) / result.runtime * 100
 
     return SolveResult(
         instance_name,
