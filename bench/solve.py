@@ -61,6 +61,10 @@ def write_solution(where: Path, data, result):
 
 
 def pi(stats, bks_value: int) -> float:
+    """
+    Computes the primal integral over the given statistics, using the provided
+    best-known solution value.
+    """
     if len(stats.data) == 0:
         return 100
 
