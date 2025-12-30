@@ -60,6 +60,20 @@ def write_solution(where: Path, data, result):
         fh.write(f"Cost: {round(result.cost(), 2)}\n")
 
 
+def pi(stats, bks_value: int) -> float:
+    if len(stats.data) == 0:
+        return 100
+
+    bks_value = min(bks_value, stats.data[-1].best_cost)
+    best_values = np.array([datum.best_cost for datum in stats], dtype=float)
+    gaps = (best_values - bks_value) / best_values
+
+    is_feas = np.array([datum.best_feas for datum in stats], dtype=bool)
+    gaps[~is_feas] = 1
+
+    return 100 * np.sum(gaps * stats.runtimes) / sum(stats.runtimes)
+
+
 class SolveResult(NamedTuple):
     """
     Named tuple to store the results of a single solver run.
@@ -207,21 +221,7 @@ def _solve(
         cost_eval = CostEvaluator([0] * data.num_load_dimensions, 0, 0)
         bks = cost_eval.cost(sol)
         gap = 100 * (result.cost() - bks) / bks
-
-        stats = result.stats
-        primal_integral = 100
-        if stats.data and result.is_feasible():
-            # Compute primal gap from the first feasible solution onward.
-            feas = next(idx for idx, d in enumerate(stats.data) if d.best_feas)
-            costs = np.array([d.best_cost for d in stats.data[feas:]])
-            gaps = abs(bks - costs) / np.maximum(abs(costs), abs(bks))
-            gaps = np.concatenate([[1], gaps])  # gap is 1 till first incumbent
-
-            # Time intervals between incumbent solutions (including start and
-            # end of the solver progress).
-            found_at = np.cumsum(stats.runtimes)[feas:]
-            times = np.diff(prepend=0, a=found_at, append=result.runtime)
-            primal_integral = sum(gaps * times) / result.runtime * 100
+        primal_integral = pi(result.stats, bks)
 
     return SolveResult(
         instance_name,
