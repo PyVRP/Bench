@@ -1,9 +1,12 @@
 from functools import partial
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import numpy as np
 from tqdm.contrib.concurrent import process_map
+
+if TYPE_CHECKING:
+    from pyvrp import Statistics
 
 
 def tabulate(headers: list[str], rows: np.ndarray) -> str:
@@ -60,7 +63,7 @@ def write_solution(where: Path, data, result):
         fh.write(f"Cost: {round(result.cost(), 2)}\n")
 
 
-def pi(stats, bks_value: int) -> float:
+def pi(stats: "Statistics", bks_value: int) -> float:
     """
     Computes the primal integral over the given statistics, using the provided
     best-known solution value.
