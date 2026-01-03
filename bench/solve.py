@@ -293,8 +293,8 @@ def benchmark(
         "PI (%)",
     ]
 
-    exclude_headers = solutions is None
-    if exclude_headers:
+    exclude_bks_measures = solutions is None
+    if exclude_bks_measures:
         data = data[["inst", "ok", "obj", "iters", "time"]]
         headers = headers[:-2]
 
@@ -304,7 +304,7 @@ def benchmark(
     print(f"      Avg. run-time: {data['time'].mean():.2f}s")
     print(f"       Total not OK: {np.count_nonzero(data['ok'] == 'N')}")
 
-    if not exclude_headers:
+    if not exclude_bks_measures:
         print(f"           Avg. gap: {data['gap'].mean():.2f}%")
         print(f"            Avg. PI: {data['pi'].mean():.2f}%")
 
