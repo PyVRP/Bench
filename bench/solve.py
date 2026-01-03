@@ -1,9 +1,12 @@
 from functools import partial
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import numpy as np
 from tqdm.contrib.concurrent import process_map
+
+if TYPE_CHECKING:
+    from pyvrp import Statistics
 
 
 def tabulate(headers: list[str], rows: np.ndarray) -> str:
@@ -60,6 +63,24 @@ def write_solution(where: Path, data, result):
         fh.write(f"Cost: {round(result.cost(), 2)}\n")
 
 
+def pi(stats: "Statistics", bks_value: int) -> float:
+    """
+    Computes the primal integral over the given statistics, using the provided
+    best-known solution value.
+    """
+    if len(stats.data) == 0:
+        return 100
+
+    bks_value = min(bks_value, stats.data[-1].best_cost)
+    best_values = np.array([datum.best_cost for datum in stats], dtype=float)
+    gaps = (best_values - bks_value) / best_values
+
+    is_feas = np.array([datum.best_feas for datum in stats], dtype=bool)
+    gaps[~is_feas] = 1
+
+    return 100 * np.sum(gaps * stats.runtimes) / sum(stats.runtimes)
+
+
 class SolveResult(NamedTuple):
     """
     Named tuple to store the results of a single solver run.
@@ -79,6 +100,16 @@ class SolveResult(NamedTuple):
     gap
         The gap to the best-known solution if there is one, otherwise
         ``float('nan')``.
+    primal_integral
+        The primal integral of the solver run if a best-known solution is
+        provided and statistics are collected. Otherwise, ``float('nan')``.
+        See [1]_ for details.
+
+    References
+    ----------
+    .. [1] Berthold, T. (2013). Measuring the impact of primal heuristics.
+            *Operations Research Letters*, 41(6): 611-614.
+            https://doi.org/10.1016/j.orl.2013.08.007.
     """
 
     instance: str
@@ -87,6 +118,7 @@ class SolveResult(NamedTuple):
     num_iterations: int
     runtime: float
     gap: float
+    primal_integral: float
 
 
 def _solve(
@@ -189,11 +221,14 @@ def _solve(
         write_solution(sol_dir / (instance_name + ".sol"), data, result)
 
     gap = float("nan")
+    primal_integral = float("nan")
+
     if bks_loc:
         sol = read_solution(bks_loc, data)
         cost_eval = CostEvaluator([0] * data.num_load_dimensions, 0, 0)
         bks = cost_eval.cost(sol)
         gap = 100 * (result.cost() - bks) / bks
+        primal_integral = pi(result.stats, bks)
 
     return SolveResult(
         instance_name,
@@ -202,6 +237,7 @@ def _solve(
         result.num_iterations,
         round(result.runtime, 3),
         round(gap, 2),
+        round(primal_integral, 2),
     )
 
 
@@ -246,15 +282,24 @@ def benchmark(
         ("iters", int),
         ("time", float),
         ("gap", float),
+        ("pi", float),
     ]
 
     data = np.asarray(res, dtype=dtypes)
-    headers = ["Instance", "OK", "Obj.", "Iters. (#)", "Time (s)", "Gap (%)"]
+    headers = [
+        "Instance",
+        "OK",
+        "Obj.",
+        "Iters. (#)",
+        "Time (s)",
+        "Gap (%)",
+        "PI (%)",
+    ]
 
-    exclude_gap = solutions is None
-    if exclude_gap:
+    exclude_bks_measures = solutions is None
+    if exclude_bks_measures:
         data = data[["inst", "ok", "obj", "iters", "time"]]
-        headers = headers[:-1]
+        headers = headers[:-2]
 
     print("\n", tabulate(headers, data), "\n", sep="")
     print(f"     Avg. objective: {data['obj'].mean():.0f}")
@@ -262,8 +307,9 @@ def benchmark(
     print(f"      Avg. run-time: {data['time'].mean():.2f}s")
     print(f"       Total not OK: {np.count_nonzero(data['ok'] == 'N')}")
 
-    if not exclude_gap:
+    if not exclude_bks_measures:
         print(f"           Avg. gap: {data['gap'].mean():.2f}%")
+        print(f"            Avg. PI: {data['pi'].mean():.2f}%")
 
 
 def setup_parser(subparser):
@@ -280,8 +326,8 @@ def setup_parser(subparser):
 
     msg = """
     Optional paths to best-known solutions in VRPLIB format, used to calculate
-    gaps. If provided, it must match the number of instances. Instances and
-    solutions are paired in the given order.
+    gaps and primal integrals. If provided, it must match the number of
+    instances. Instances and solutions are paired in the given order.
     """
     parser.add_argument("--solutions", nargs="+", type=Path, help=msg)
 
