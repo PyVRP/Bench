@@ -32,37 +32,6 @@ def tabulate(headers: list[str], rows: np.ndarray) -> str:
     return "\n".join(header + content)
 
 
-def write_solution(where: Path, data, result):
-    with open(where, "w") as fh:
-        if data.num_vehicle_types == 1:
-            for idx, route in enumerate(result.best.routes(), 1):
-                visits = [str(visit.location) for visit in route.schedule()]
-                visits = visits[1:-1]  # skip start and end depots
-                fh.write(f"Route #{idx}: {' '.join(visits)}\n")
-
-            fh.write(f"Cost: {round(result.cost(), 2)}\n")
-            return
-
-        # Since there are multiple vehicle types, we need to take some care
-        # to assign the routes to the proper vehicle. We print all routes,
-        # including empty ones. The route indices correspond to the vehicles.
-        type2vehicle = [
-            (int(vehicle) for vehicle in vehicle_type.name.split(","))
-            for vehicle_type in data.vehicle_types()
-        ]
-
-        routes = [f"Route #{idx + 1}:" for idx in range(data.num_vehicles)]
-        for route in result.best.routes():
-            visits = [str(visit.location) for visit in route.schedule()]
-            visits = visits[1:-1]  # skip start and end depots
-
-            vehicle = next(type2vehicle[route.vehicle_type()])
-            routes[vehicle] += " " + " ".join(visits)
-
-        fh.writelines(route + "\n" for route in routes)
-        fh.write(f"Cost: {round(result.cost(), 2)}\n")
-
-
 def pi(stats: "Statistics", bks_value: int) -> float:
     """
     Computes the primal integral over the given statistics, using the provided
@@ -177,6 +146,7 @@ def _solve(
             read_solution,
             solve,
         )
+        from pyvrp.cli import write_solution
         from pyvrp.stop import (
             MaxIterations,
             MaxRuntime,
